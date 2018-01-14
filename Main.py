@@ -6,6 +6,7 @@ from hslog import packets
 from hslog.parser import LogParser as Pars
 import BoardState
 import numpy as np
+import random
 
 # For Tensorboard, in terminal: tensorboard --logdir=logs
 
@@ -74,23 +75,24 @@ with tf.variable_scope('logging'):
 
 epoch = 0
 
-RUN_NAME = "Run 2 with output format 1"
+RUN_NAME = "Run 5 with 10 standardized games"
 
 # --- Main Loop ---
 with tf.Session() as session:
     session.run(tf.global_variables_initializer())
     training_writer = tf.summary.FileWriter("./logs/{}/training".format(RUN_NAME), session.graph)
 
+    # --- Load the folder to search files in ---
+
+    folderPath = "./Games/Standardized/"
+    xmlFiles = [os.path.join(root, name)
+                 for root, dirs, files in os.walk(folderPath)
+                 for name in files
+                 if name.endswith((".xml"))]
+
+    print(xmlFiles)
 
     while input() != "quit":
-
-        # --- Create Game File ---
-
-        # insert the file you wanna load here
-        fileName = 'sQXC5MkzFbbDCB3H78YZu8.hsreplay.xml'
-        pars = Pars()
-        # load the file to game
-        game = hsDoc.from_xml_file(fileName)
 
         # --- Connect to Hearthstone Client Directly ---
         # f = open("C:\Program Files (x86)\Hearthstone\Logs\Power.log", "r")
@@ -103,6 +105,14 @@ with tf.Session() as session:
         # pars.read(myList)
         # game = hsDoc.from_parser(pars, build=None)
 
+        # --- Create Game File ---
+
+        # insert the file you wanna load here
+        fileName = random.choice(xmlFiles)
+        pars = Pars()
+        # load the file to game
+        game = hsDoc.from_xml_file(fileName)
+
         # --- Crate The BoardState object ---
 
         boardState = BoardState.BoardState
@@ -114,11 +124,9 @@ with tf.Session() as session:
         players = gameNode.players
 
         # players[0] is a hsreplay.elements.PlayerNode
-        print(type(players[0]))
+        # print(type(players[0]))
 
-        # export() makes the contents readable (apparently)
-        print(players[0].export().name)
-        print(players[1].export().name)
+        print("Using Game: {}, between {} and {}".format(fileName, players[0].export().name, players[1].export().name))
 
         lastOptions = packets.Options
 
@@ -127,7 +135,7 @@ with tf.Session() as session:
                 # find the type of packet
                 if isinstance(packet, packets.Options):
                     lastOptions = packet
-                    print("Options")
+                    # print("Options")
                     # for option in packet.options:
                     #     print("Option:", option.entity)
                     # load the curent state in the network
@@ -143,37 +151,54 @@ with tf.Session() as session:
                             final =idx
 
                     if final < packet.options.__len__():
-                        print(packet.options[final].entity)
-                        print(packet.options[final].type)
-                        print(packet.options[final].optype)
-                        for opt in packet.options[final].options:
-                            print(opt)
+                        print("Network Predicts: option {}, entity {}".format(final, packet.options[final].entity))
+                        # (packet.options[final].type)
+                        # print(packet.options[final].optype)
+                        # for opt in packet.options[final].options:
+                        #     print(opt)
                     else:
                         print("Inexistent prediction")
 
 
                     # predicted = scaler.inverse_transform(scaled_predicted)
                     # display output
-                    print(scaled_predicted)
+                    # print(scaled_predicted)
 
                 elif isinstance(packet, packets.SendOption):
-                    print("sendOptions")
+                    # print("Send Options")
                     options = np.zeros(number_of_outputs)
-                    options[packet.option] = 1
+                    options[packet.option] = 10
                     # print("SelectedOption:", packet.option)
                     # print("SelectedSubOption:", packet.suboption)
                     # print("SelectedEntity:", packet.entity)
                     # print("FoundOption:", lastOption.options[packet.option].entity)
                     # compare with the network stored send options
                     # train network X is input, Y is output
+                    feed_dict = {X: (boardState.get(boardState, number_of_inputs / 1000).reshape(1, 100000))}
+                    scaled_predicted = session.run(prediction, feed_dict=feed_dict)
+
                     feed_dict = {X: (boardState.get(boardState, number_of_inputs / 1000).reshape(1, 100000)),
                                  Y: options.reshape(1, 30)}
                     session.run(optimizer, feed_dict=feed_dict)
 
                     training_cost, training_summary = session.run([cost, summary], feed_dict=feed_dict)
                     training_writer.add_summary(training_summary, epoch)
-                    print("Training Cost: {}".format(training_cost))
+                    # print("Training Cost: {}".format(training_cost))
                     epoch += 1
+
+                    best = 0.0
+                    final = 0
+                    for idx, val in enumerate(scaled_predicted[0]):
+                        if val > best:
+                            best = val
+                            final = idx
+
+                    if final < lastOptions.options.__len__():
+                        print("The network chooses: {} ; The player chooses: {}".format(final, packet.option))
+                        # for opt in packet.options[final].options:
+                        #     print(opt)
+                    else:
+                        print("Inexistent prediction")
 
                 else:
                     if isinstance(packet, packets.CreateGame):
