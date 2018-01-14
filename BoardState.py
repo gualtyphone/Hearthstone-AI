@@ -11,6 +11,7 @@ class BoardState:
 
     def __init__(self):
         print("Creating Board state")
+        self.stateDict = {}
         # The various objects will be stored as a ID, Array of tags dictionary
         x = 1
         while x <= 3:
@@ -40,7 +41,7 @@ class BoardState:
             self.stateDict[entity.entity][tag[0]] = tag[1]
 
     def get(self, numberOfEntities):
-        result = np.zeros((100000))
+        result = np.zeros(100000)
         for k in sorted(self.stateDict.keys()):
             # row = []
             for k1 in sorted(self.stateDict[k].keys()):
@@ -48,5 +49,5 @@ class BoardState:
             # result.append(row)
         # for i in result:
         #     print(i)
-        print(result)
+        # print(result)
         return result

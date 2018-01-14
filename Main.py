@@ -7,6 +7,8 @@ from hslog.parser import LogParser as Pars
 import BoardState
 import numpy as np
 
+# For Tensorboard, in terminal: tensorboard --logdir=logs
+
 # Turn off TensorFlow warning messages in program output
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -32,9 +34,9 @@ number_of_inputs = 100000
 number_of_outputs = 30
 
 # Define how many neurons we want in each layer of our neural network
-layer_1_nodes = 50
-layer_2_nodes = 100
-layer_3_nodes = 50
+layer_1_nodes = 500
+layer_2_nodes = 1000
+layer_3_nodes = 500
 
 # Section One: Define the layers of the neural network itself
 
@@ -69,7 +71,7 @@ with tf.variable_scope('output'):
 # Section Two: Define the cost function of the neural network that will measure prediction accuracy during training
 
 with tf.variable_scope('cost'):
-    Y = tf.placeholder(tf.float32, shape=(None, 1))
+    Y = tf.placeholder(tf.float32, shape=(None, number_of_outputs))
     cost = tf.reduce_mean(tf.squared_difference(prediction, Y))
 
 # Section Three: Define the optimizer function that will be run to optimize the neural network
@@ -82,68 +84,94 @@ with tf.variable_scope('logging'):
     tf.summary.scalar('current_cost', cost)
     summary = tf.summary.merge_all()
 
+epoch = 0
+
+RUN_NAME = "Run 2 with output format 1"
 
 # --- Main Loop ---
-
-while input() != "quit":
-    # f = open("C:\Program Files (x86)\Hearthstone\Logs\Power.log", "r")
-    # myList = []
-    # for line in f:
-    #     myList.append(line)
-    # f.close()
-    #
-    #
-    # pars.read(myList)
-    # game = hsDoc.from_parser(pars, build=None)
-
-    # load the gameNode that contains the whole game
-    gameNode = game.games[-1]
-
-    # in gameNode there are players
-    players = gameNode.players
-
-    # players[0] is a hsreplay.elements.PlayerNode
-    print(type(players[0]))
-
-    # export() makes the contents readable (apparently)
-    print(players[0].export().name)
-    print(players[1].export().name)
-
-    lastOption = packets.Options
-
-    with tf.Session() as session:
-
-        session.run(tf.global_variables_initializer())
+with tf.Session() as session:
+    session.run(tf.global_variables_initializer())
+    training_writer = tf.summary.FileWriter("./logs/{}/training".format(RUN_NAME), session.graph)
 
 
+    while input() != "quit":
+        # f = open("C:\Program Files (x86)\Hearthstone\Logs\Power.log", "r")
+        # myList = []
+        # for line in f:
+        #     myList.append(line)
+        # f.close()
+        #
+        #
+        # pars.read(myList)
+        # game = hsDoc.from_parser(pars, build=None)
 
-        # For loop getting all events of the game
+        # load the gameNode that contains the whole game
+        gameNode = game.games[-1]
 
-        def _iter_recursive(_packets):
+        # in gameNode there are players
+        players = gameNode.players
+
+        # players[0] is a hsreplay.elements.PlayerNode
+        print(type(players[0]))
+
+        # export() makes the contents readable (apparently)
+        print(players[0].export().name)
+        print(players[1].export().name)
+
+        lastOptions = packets.Options
+
+        def _iter_recursive(_packets, epoch):
             for packet in _packets:
                 # find the type of packet
                 if isinstance(packet, packets.Options):
-                    lastOption = packet
-                    # print("Options")
+                    lastOptions = packet
+                    print("Options")
                     # for option in packet.options:
                     #     print("Option:", option.entity)
                     # load the curent state in the network
                     # run the network and get the desired output
-                    scaled_predicted = session.run(prediction, feed_dict={X: (boardState.get(boardState, number_of_inputs/1000).reshape(1, 100000))})
+                    feed_dict = {X: (boardState.get(boardState, number_of_inputs/1000).reshape(1, 100000))}
+                    scaled_predicted = session.run(prediction, feed_dict=feed_dict)
+
+                    best = 0.0
+                    final = 0
+                    for idx, val in enumerate(scaled_predicted[0]):
+                        if val > best:
+                            best = val
+                            final =idx
+
+                    if final < packet.options.__len__():
+                        print(packet.options[final].entity)
+                        print(packet.options[final].type)
+                        print(packet.options[final].optype)
+                        for opt in packet.options[final].options:
+                            print(opt)
+                    else:
+                        print("Inexistent prediction")
+
+
                     # predicted = scaler.inverse_transform(scaled_predicted)
                     # display output
                     print(scaled_predicted)
 
                 elif isinstance(packet, packets.SendOption):
-                    lastOption = packet
-                    # print("sendOptions")
+                    print("sendOptions")
+                    options = np.zeros(number_of_outputs)
+                    options[packet.option] = 1
                     # print("SelectedOption:", packet.option)
                     # print("SelectedSubOption:", packet.suboption)
                     # print("SelectedEntity:", packet.entity)
                     # print("FoundOption:", lastOption.options[packet.option].entity)
                     # compare with the network stored send options
-                    # train network
-                    # session.run(optimizer, feed_dict={})
+                    # train network X is input, Y is output
+                    feed_dict = {X: (boardState.get(boardState, number_of_inputs / 1000).reshape(1, 100000)),
+                                 Y: options.reshape(1, 30)}
+                    session.run(optimizer, feed_dict=feed_dict)
+
+                    training_cost, training_summary = session.run([cost, summary], feed_dict=feed_dict)
+                    training_writer.add_summary(training_summary, epoch)
+                    print("Training Cost: {}".format(training_cost))
+                    epoch += 1
 
                 else:
                     if isinstance(packet, packets.CreateGame):
@@ -157,16 +185,17 @@ while input() != "quit":
                     elif isinstance(packet, packets.MetaData):
                         continue
                     elif isinstance(packet, packets.Block):
-                        _iter_recursive(packet.packets)
+                        epoch = _iter_recursive(packet.packets, epoch)
                     else:
                         print(packet)
                     # update the board state tensor
+            return epoch
 
-        _iter_recursive(gameNode.export())
+        epoch = _iter_recursive(gameNode.export(), epoch)
 
         boardState.get(boardState, number_of_inputs/1000)
 
-        print("EndOfLoop")
+        print("End Of Loop")
         # For loop getting all Blocks Types
         # for packet in gameNode.export().recursive_iter(packets.Block):
         # print(packet)
