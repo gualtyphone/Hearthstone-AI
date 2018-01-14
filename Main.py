@@ -12,18 +12,6 @@ import numpy as np
 # Turn off TensorFlow warning messages in program output
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-# --- Create Game File ---
-
-# insert the file you wanna load here
-fileName = 'sQXC5MkzFbbDCB3H78YZu8.hsreplay.xml'
-pars = Pars()
-# load the file to game
-game = hsDoc.from_xml_file(fileName)
-
-# --- Crate The BoardState object ---
-
-boardState = BoardState.BoardState
-
 # --- Create Neural Network ---
 
 # Define model parameters
@@ -95,6 +83,16 @@ with tf.Session() as session:
 
 
     while input() != "quit":
+
+        # --- Create Game File ---
+
+        # insert the file you wanna load here
+        fileName = 'sQXC5MkzFbbDCB3H78YZu8.hsreplay.xml'
+        pars = Pars()
+        # load the file to game
+        game = hsDoc.from_xml_file(fileName)
+
+        # --- Connect to Hearthstone Client Directly ---
         # f = open("C:\Program Files (x86)\Hearthstone\Logs\Power.log", "r")
         # myList = []
         # for line in f:
@@ -104,6 +102,10 @@ with tf.Session() as session:
         #
         # pars.read(myList)
         # game = hsDoc.from_parser(pars, build=None)
+
+        # --- Crate The BoardState object ---
+
+        boardState = BoardState.BoardState
 
         # load the gameNode that contains the whole game
         gameNode = game.games[-1]
