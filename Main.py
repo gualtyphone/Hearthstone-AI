@@ -6,9 +6,12 @@ from hslog import packets
 from hslog.parser import LogParser as Pars
 import BoardState
 import numpy as np
-import random
+import GameLoader
 
 # For Tensorboard, in terminal: tensorboard --logdir=logs
+
+# 0 - Logs, 1- Client Connect PC, 2 - Client Connect MAC
+mode = 0
 
 # Turn off TensorFlow warning messages in program output
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -19,13 +22,13 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 learning_rate = 0.001
 
 # Define how many inputs and outputs are in our neural network
-number_of_inputs = 100000
+number_of_inputs = 25350
 number_of_outputs = 30
 
 # Define how many neurons we want in each layer of our neural network
-layer_1_nodes = 500
-layer_2_nodes = 1000
-layer_3_nodes = 500
+layer_1_nodes = 50
+layer_2_nodes = 100
+layer_3_nodes = 50
 
 # Section One: Define the layers of the neural network itself
 
@@ -75,43 +78,32 @@ with tf.variable_scope('logging'):
 
 epoch = 0
 
-RUN_NAME = "Run 5 with 10 standardized games"
+RUN_NAME = "Run 13"
+
+def modeloop(mode):
+    if mode == 0:
+        return 1
+    else:
+        return input() != quit
+
 
 # --- Main Loop ---
 with tf.Session() as session:
     session.run(tf.global_variables_initializer())
     training_writer = tf.summary.FileWriter("./logs/{}/training".format(RUN_NAME), session.graph)
 
-    # --- Load the folder to search files in ---
+    mode = int(input("Select Game Loading Mode (0 - Logs, 1- Client Connect PC, 2 - Client Connect MAC):"))
 
-    folderPath = "./Games/Standardized/"
-    xmlFiles = [os.path.join(root, name)
-                 for root, dirs, files in os.walk(folderPath)
-                 for name in files
-                 if name.endswith((".xml"))]
+    while modeloop(mode):
 
-    print(xmlFiles)
+        game = None
 
-    while input() != "quit":
-
-        # --- Connect to Hearthstone Client Directly ---
-        # f = open("C:\Program Files (x86)\Hearthstone\Logs\Power.log", "r")
-        # myList = []
-        # for line in f:
-        #     myList.append(line)
-        # f.close()
-        #
-        #
-        # pars.read(myList)
-        # game = hsDoc.from_parser(pars, build=None)
-
-        # --- Create Game File ---
-
-        # insert the file you wanna load here
-        fileName = random.choice(xmlFiles)
-        pars = Pars()
-        # load the file to game
-        game = hsDoc.from_xml_file(fileName)
+        if mode == 0:
+            game = GameLoader.LoadRandomizedLog()
+        elif mode == 1:
+            game = GameLoader.loadPcGame()
+        else:
+            game = GameLoader.loadMacGame()
 
         # --- Crate The BoardState object ---
 
@@ -126,7 +118,7 @@ with tf.Session() as session:
         # players[0] is a hsreplay.elements.PlayerNode
         # print(type(players[0]))
 
-        print("Using Game: {}, between {} and {}".format(fileName, players[0].export().name, players[1].export().name))
+        print("Using Game between {} and {}".format(players[0].export().name, players[1].export().name))
 
         lastOptions = packets.Options
 
@@ -140,7 +132,7 @@ with tf.Session() as session:
                     #     print("Option:", option.entity)
                     # load the curent state in the network
                     # run the network and get the desired output
-                    feed_dict = {X: (boardState.get(boardState, number_of_inputs/1000).reshape(1, 100000))}
+                    feed_dict = {X: (boardState.get(boardState, 100, lastOptions).reshape(1, number_of_inputs))}
                     scaled_predicted = session.run(prediction, feed_dict=feed_dict)
 
                     best = 0.0
@@ -148,7 +140,7 @@ with tf.Session() as session:
                     for idx, val in enumerate(scaled_predicted[0]):
                         if val > best:
                             best = val
-                            final =idx
+                            final = idx
 
                     if final < packet.options.__len__():
                         print("Network Predicts: option {}, entity {}".format(final, packet.options[final].entity))
@@ -174,17 +166,17 @@ with tf.Session() as session:
                     # print("FoundOption:", lastOption.options[packet.option].entity)
                     # compare with the network stored send options
                     # train network X is input, Y is output
-                    feed_dict = {X: (boardState.get(boardState, number_of_inputs / 1000).reshape(1, 100000))}
+                    feed_dict = {X: (boardState.get(boardState, 100, lastOptions).reshape(1, number_of_inputs))}
                     scaled_predicted = session.run(prediction, feed_dict=feed_dict)
 
-                    feed_dict = {X: (boardState.get(boardState, number_of_inputs / 1000).reshape(1, 100000)),
+                    feed_dict = {X: (boardState.get(boardState, 100, lastOptions).reshape(1, number_of_inputs)),
                                  Y: options.reshape(1, 30)}
                     session.run(optimizer, feed_dict=feed_dict)
 
                     training_cost, training_summary = session.run([cost, summary], feed_dict=feed_dict)
                     training_writer.add_summary(training_summary, epoch)
                     # print("Training Cost: {}".format(training_cost))
-                    epoch += 1
+
 
                     best = 0.0
                     final = 0
@@ -201,6 +193,7 @@ with tf.Session() as session:
                         print("Inexistent prediction")
 
                 else:
+                    # update the board state tensor
                     if isinstance(packet, packets.CreateGame):
                         boardState.__init__(boardState)
                     elif isinstance(packet, packets.FullEntity):
@@ -215,17 +208,11 @@ with tf.Session() as session:
                         epoch = _iter_recursive(packet.packets, epoch)
                     else:
                         print(packet)
-                    # update the board state tensor
             return epoch
 
         epoch = _iter_recursive(gameNode.export(), epoch)
+        epoch += 1
 
-        boardState.get(boardState, number_of_inputs/1000)
+        # boardState.print(boardState)
 
         print("End Of Loop")
-        # For loop getting all Blocks Types
-        # for packet in gameNode.export().recursive_iter(packets.Block):
-        # print(packet)
-
-#whenever you get <options> it's waiting for an action
-#after each <options> there is a <SendOptions>
