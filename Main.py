@@ -78,7 +78,7 @@ with tf.variable_scope('logging'):
 
 epoch = 0
 
-RUN_NAME = "Run 13"
+RUN_NAME = "Run 14"
 
 def modeloop(mode):
     if mode == 0:
