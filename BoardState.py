@@ -4,9 +4,10 @@ from hsreplay.document import HSReplayDocument as hsDoc
 from hslog import packets
 from hslog.parser import LogParser as Pars
 import numpy as np
-import  ANNenums
+import ANNenums
 
-class BoardState:
+
+class BoardState(object):
 
     stateDict = {}
 
