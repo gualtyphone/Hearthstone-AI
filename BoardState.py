@@ -38,6 +38,7 @@ class BoardState(object):
         for tag in entity.tags:
             self.stateDict[entity.entity][tag[0]] = tag[1]
 
+
     def get(self, numberOfEntities, lastOptions):
         result = np.zeros(int((ANNenums.GameTag.__len__() * numberOfEntities) + 150))
         y = 0
