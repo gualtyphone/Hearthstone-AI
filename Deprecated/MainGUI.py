@@ -8,7 +8,6 @@ import BoardState
 import cv2
 
 # Creating the network from scratch
-# TODO: Add possibility to load previous networks
 network = HearthRNN.RNN()
 
 # Creating Boardstate object

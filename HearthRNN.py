@@ -15,6 +15,7 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 
 
+
 class RNN(object):
     def __init__(self):
         """ TODO: Implement Constructor """
@@ -93,14 +94,14 @@ class RNN(object):
 
         return (x, y)
 
-    def train(self):
+    def train(self, gui):
         """ TODO: Implement """
         # Takes the Boardstate with possible choices and returns the predicted move,
         # saving the error and updates the network
         x, y = self.generateData()
         _current_state = np.zeros((self.num_layers, 2, self.batch_size, self.state_size))
 
-        # print("New data, Epoch", self.epoch_idx)
+        # Debug("New data, Epoch", self.epoch_idx)
 
         for batch_idx in range(self.num_batches):
             start_idx = batch_idx * self.truncated_backprop_length
@@ -120,7 +121,7 @@ class RNN(object):
             self.loss_list.append(_total_loss)
 
             if batch_idx % 100 == 0:
-                print("Step", batch_idx, "Loss", _total_loss)
+                gui.debug("%s", ("Training:", "Step", batch_idx, "Loss", _total_loss))
                 self.plot(self.loss_list, _prediction_series, batchX, batchY)
 
     def test(self):
