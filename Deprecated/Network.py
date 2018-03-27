@@ -8,7 +8,6 @@ import BoardState
 import numpy as np
 import GameLoader
 
-
 class Network(object):
     def __init__(self):
         self.mode = 0
@@ -104,11 +103,12 @@ class Network(object):
             self.game = GameLoader.loadMacGame()
 
         # --- Crate The BoardState object ---
-
         self.boardState = BoardState.BoardState()
 
         # load the gameNode that contains the whole game
         self.gameNode = self.game.games[-1]
+
+        self.gameNode.
 
         # in gameNode there are players
         self.players = self.gameNode.players

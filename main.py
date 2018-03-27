@@ -13,6 +13,36 @@ gameLoader = GameLoader()
 
 currentEpochCount = 0
 
+def runNetwork(currentEpochCount, boardState):
+    # If the mode is "Get from running HS"
+    if gui.dataLoadingMode == 1 or gui.dataLoadingMode == 2:
+        if gui.trainMode:
+            boardState = network.train(gui, boardState, gameLoader.game)
+        if gui.testMode:
+            boardState = network.test(gui, boardState)
+        if gui.predictMode:
+            boardState = network.predict(gui, boardState)
+        gui.Plot(network)
+    else:
+        # if the network has epochs to run
+        if int(gui.frames[Options].epochsToRun.get()) > currentEpochCount:
+            # Run next epoch
+            if gui.trainMode:
+                boardState = network.train(gui, boardState, gameLoader.game)
+            if gui.testMode:
+                boardState = network.test(gui, boardState)
+            if gui.predictMode:
+                boardState = network.predict(gui, boardState)
+            gui.Plot(network)
+            # Increase the epoch count
+            if network.endOfGame:
+                currentEpochCount += 1
+        else:
+            gui.stopNetwork()
+            currentEpochCount = 0
+
+    return currentEpochCount, boardState
+
 """ MAIN LOOP """
 while running:
 
@@ -20,70 +50,22 @@ while running:
     running = gui.running
 
     # If the gui says to run the network
-    # TRAIN MODE
-    if gui.trainMode:
-        gameLoader.Update()
-        # If the mode is "Get from running HS"
-        if gui.dataLoadingMode == 1 | gui.dataLoadingMode == 2:
+    if gui.trainMode or gui.testMode or gui.predictMode:
+        if network.endOfGame:
+            # Check Game for update
+            # boardState.reset()
+            gameLoader.Update(gui.dataLoadingMode)
             # if there is an update to analyze
             if gameLoader.gameUpdated:
-                network.train(gui)
+                network.endOfGame = False
+                network.newGame = True
+                currentEpochCount, boardState = runNetwork(currentEpochCount, boardState)
+                gui.displayOptionsAndBoard(boardState)
+                gameLoader.gameUpdated = False
         else:
-            # if the network has epochs to run
-            if int(gui.frames[Options].epochsToRun.get()) > currentEpochCount:
-                # Load next Game
-                if gameLoader.gameUpdated:
-                    # Run next epoch
-                    network.train(gui)
-                    gui.Plot(network)
-                # Increase the epoch count
-                currentEpochCount += 1
-            else:
-                gui.stopNetwork()
-                currentEpochCount = 0
-
-    # TEST MODE
-    elif gui.testMode:
-        gameLoader.Update()
-        # If the mode is "Get from running HS"
-        if gui.dataLoadingMode == 1 | gui.dataLoadingMode == 2:
-            # if there is an update to analyze
-            if gameLoader.gameUpdated:
-                network.test()
-        else:
-            # if the network has epochs to run
-            if int(gui.frames[Options].epochsToRun.get()) > currentEpochCount:
-                # Load next Game
-                if gameLoader.gameUpdated:
-                    # Run next epoch
-                    network.test()
-                    gui.Plot(network)
-                # Increase the epoch count
-                currentEpochCount += 1
-            else:
-                gui.stopNetwork()
-                currentEpochCount = 0
-    # PREDICT MODE
-    elif gui.predictMode:
-        gameLoader.Update()
-        # If the mode is "Get from running HS"
-        if gui.dataLoadingMode == 1 | gui.dataLoadingMode == 2:
-            # if there is an update to analyze
-            if gameLoader.gameUpdated:
-                network.predict()
-        else:
-            # if the network has epochs to run
-            if int(gui.frames[Options].epochsToRun.get()) > currentEpochCount:
-                # Load next Game
-                if gameLoader.gameUpdated:
-                    # Run next epoch
-                    network.predict()
-                # Increase the epoch count
-                currentEpochCount += 1
-            else:
-                gui.stopNetwork()
-                currentEpochCount = 0
-
+            #Network hasn't finished current game
+                currentEpochCount, boardState = runNetwork(currentEpochCount, boardState)
+                gui.displayOptionsAndBoard(boardState)
 
 """ DESTRUCTOR """
 print("Quitting")

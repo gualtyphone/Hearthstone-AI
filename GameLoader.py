@@ -12,20 +12,35 @@ class GameLoader(object):
 
         self.gameUpdated = False
 
-    def Update(self):
+        self.newGame = False
+
+    def Update(self, dataLoadingMode):
+        self.mode = dataLoadingMode
         self.previousGame = self.game
         if  self.mode == 0:
             self.game = self.loadRandomizedLog()
+            self.newGame = True
         elif self.mode == 1:
             self.game = self.loadPcGame()
+            self.newGame = self.checkNewGame()
         elif self.mode == 2:
             self.game = self.loadMacGame()
-
+            self.newGame = self.checkNewGame()
         if self.previousGame == self.game:
             self.gameUpdated = False
             return
 
         self.on_game_updated()
+
+    def checkNewGame(self):
+        if self.previousGame.game.games[-1].players[0].export().name == self.game.game.games[-1].players[0].export().name:
+            if self.previousGame.game.games[-1].players[1].export().name == self.game.game.games[-1].players[1].export().name:
+                #Same players, assuming same game
+                self.newGame = False
+                return
+        # Different players, surely different game
+        self.newGame = True
+        return
 
     def on_game_updated(self):
         self.gameUpdated = True

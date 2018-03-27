@@ -9,12 +9,45 @@ import ANNenums
 
 class BoardState(object):
 
-    stateDict = {}
-
     def __init__(self):
-        print("Creating Board state")
         self.stateDict = {}
+        self.board = list()
+        self.options = list()
+        for i in range(100):
+            self.board.append("")
+        self.optionsPacket = None
+        self.selectedOptions = {}
+        self.reset()
+
+    def reset(self):
+        print("Resetting Board state")
         # The various objects will be stored as a ID, Array of tags dictionary
+
+        self.board.clear()
+        for i in range(100):
+            self.board.append("")
+        self.board[0] = "EndTurnButton"
+        self.board[1] = "GameReference"
+        self.board[2] = "Player1Reference"
+        self.board[3] = "Player2Reference"
+        x = 1
+        while x <= 3:
+            self.stateDict[x] = {}
+            for tag in ANNenums.GameTag:
+                self.stateDict[x][tag] = 0
+            x += 1
+
+    def createGame(self, gamePacket):
+        print("creating Board state")
+        # The various objects will be stored as a ID, Array of tags dictionary
+
+        self.board.clear()
+        for i in range(100):
+            self.board.append("")
+        self.board[0] = "EndTurnButton"
+        self.board[1] = "GameReference"
+        self.board[2] = "Player: " + gamePacket.players[0].name
+        self.board[3] = "Player: " + gamePacket.players[1].name
         x = 1
         while x <= 3:
             self.stateDict[x] = {}
@@ -25,6 +58,8 @@ class BoardState(object):
     def addEntity(self, entity):
         # print(type(entity.entity))
         self.stateDict[entity.entity] = {}
+        self.board[entity.entity] = entity.card_id
+        # self.board[entity.entity] = entity.card_id
         for tag in ANNenums.GameTag:
             self.stateDict[entity.entity][tag] = 0
         for tag in entity.tags:
@@ -35,9 +70,24 @@ class BoardState(object):
         self.stateDict[tagChanged.entity][tagChanged.tag] = tagChanged.value
 
     def showEntity(self, entity):
+        self.board[entity.entity] = entity.card_id
         for tag in entity.tags:
             self.stateDict[entity.entity][tag[0]] = tag[1]
 
+    def getOptions(self):
+        # Return the options in a good format
+        """TODO: Implement"""
+        return self.options
+
+    def setOptions(self, packet):
+        """TODO: Implement"""
+        self.options.clear()
+        for opt in packet.options:
+            optionDescriptor = (opt.id, " - ", opt.entity, self.board[opt.entity], opt.type)
+            self.options.append(optionDescriptor)
+
+    def setSelectedOptions(self, packet):
+        """TODO: Implement"""
 
     def get(self, numberOfEntities, lastOptions):
         result = np.zeros(int((ANNenums.GameTag.__len__() * numberOfEntities) + 150))

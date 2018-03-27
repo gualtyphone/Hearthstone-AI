@@ -74,13 +74,6 @@ class HS_GUI(tk.Tk):
 
 
     def Draw(self):
-        if self.frames[Options].dataLoadingModeButton.get() == "0-Load From Stored Data":
-            self.dataLoadingMode = 0
-        elif self.frames[Options].dataLoadingModeButton.get() == "1-Load From Windows APP":
-            self.dataLoadingMode = 1
-        elif self.frames[Options].dataLoadingModeButton.get() == "2-Load From Mac APP":
-            self.dataLoadingMode = 2
-
         self.update_idletasks()
         self.update()
 
@@ -103,16 +96,27 @@ class HS_GUI(tk.Tk):
             self.destroy()
             self.running = False
 
+    def shared_startNetword(self):
+        if self.frames[Options].dataLoadingModeButton.get() == "0-Load From Stored Data":
+            self.dataLoadingMode = 0
+        elif self.frames[Options].dataLoadingModeButton.get() == "1-Load From Windows APP":
+            self.dataLoadingMode = 1
+        elif self.frames[Options].dataLoadingModeButton.get() == "2-Load From Mac APP":
+            self.dataLoadingMode = 2
+
     def beginTrain(self):
-        self.trainMode = True
+        self.shared_startNetword()
         self.show_frame(TrainingDisplay)
+        self.trainMode = True
         self.debug("%s", "Begin Training")
 
     def beginTest(self):
+        self.shared_startNetword()
         self.testMode = True
         self.debug("%s", "Begin Testing")
 
     def beginPredict(self):
+        self.shared_startNetword()
         self.predictMode = True
         self.debug("%s", "Begin Predicting")
 
@@ -127,6 +131,11 @@ class HS_GUI(tk.Tk):
 
     def debug(self, format, *args):
         self.status.set(format, *args)
+
+    def displayOptionsAndBoard(self, boardstate):
+        """TODO: Implement"""
+        self.frames[TrainingDisplay].networkOptions.setOptions(boardstate.options)
+        self.frames[TrainingDisplay].boardstate.setBoard(boardstate.board)
 
 class MainMenu(tk.Frame):
 
@@ -188,7 +197,7 @@ class TrainingDisplay(tk.Frame):
 
         self.boardstateFrame = tk.Frame(boardframe)
         # Boardstate DISPLAY
-        self.boardstate = OptionsDisplay(self.boardstateFrame)
+        self.boardstate = BoardStateDisplay(self.boardstateFrame)
         self.boardstate.pack(fill=X, side=LEFT, expand=True)
 
         self.boardstateFrame.pack(fill=X, expand=True)
@@ -278,8 +287,11 @@ class OptionsDisplay(tk.Frame):
         self.list = tk.Listbox(self, bd=1, relief=tk.SUNKEN)
         self.list.pack(fill=tk.X, expand=True)
 
-    def setOptions(self, boardstate):
-        """TODO: IMPLEMENT"""
+    def setOptions(self, optionsList):
+        """TODO: Implement"""
+        self.list.delete(0, END)
+        for item in optionsList:
+            self.list.insert(END, item)
 
 class BoardStateDisplay(tk.Frame):
 
@@ -287,3 +299,9 @@ class BoardStateDisplay(tk.Frame):
         tk.Frame.__init__(self, master)
         self.list = tk.Listbox(self, bd=1, relief=tk.SUNKEN)
         self.list.pack(fill=tk.X, expand=True)
+
+    def setBoard(self, boardState):
+        """TODO: Implement"""
+        self.list.delete(0, END)
+        for item in boardState:
+            self.list.insert(END, item)

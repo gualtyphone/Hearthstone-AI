@@ -20,10 +20,12 @@ class RNN(object):
     def __init__(self):
         """ TODO: Implement Constructor """
         # Variables
-        self.num_epochs = 100
+        self.x_length = 10  # Number of input variables
+        self.y_length = 10  # Number of output variables
+        self.truncated_backprop_length = 15  # Number of iterations to apply backpropagation
+
         self.total_series_length = 50000
-        self.truncated_backprop_length = 15
-        self.state_size = 4
+        self.state_size = 4  # Cell state and Hidden state vector length
         self.num_classes = 2
         self.echo_step = 3
         self.batch_size = 5
@@ -31,12 +33,14 @@ class RNN(object):
         self.num_layers = 3
 
         self.RUN_NAME = "Run 20"
+        self.endOfGame = True
+        self.newGame = True
 
         # Tesnorflow placeholders
-        self.batchX_placeholder = tf.placeholder(tf.float32, [self.batch_size, self.truncated_backprop_length])
-        self.batchY_placeholder = tf.placeholder(tf.int32, [self.batch_size, self.truncated_backprop_length])
+        self.batchX_placeholder = tf.placeholder(tf.float32, [None, self.truncated_backprop_length])
+        self.batchY_placeholder = tf.placeholder(tf.int32, [None, self.truncated_backprop_length])
 
-        self.init_state = tf.placeholder(tf.float32, [self.num_layers, 2, self.batch_size, self.state_size])
+        self.init_state = tf.placeholder(tf.float32, [self.num_layers, 2, None, self.state_size])
 
         self.state_per_layer_list = tf.unstack(self.init_state, axis=0)
         self.rnn_tuple_state = tuple(
@@ -82,9 +86,29 @@ class RNN(object):
         self.sess.run(tf.initialize_all_variables())
         self.loss_list = []
 
-    def generateData(self):
+    def rec_iter(self, boardState, game):
+        while self.index < game.games[-1].export().packets.__len__():
+            boardState, self.foundOptions, self.foundSendOptions = self.analyzePacket(
+                game.games[-1].export().packets[self.index], boardState)
+            self.index += 1
+            if self.foundSendOptions or self.foundOptions:
+                return boardState
+        else:
+            self.endOfGame = True
+        return boardState
+
+    def generateData(self, boardState, game):
         """ TODO: Implement Data Generation"""
         # This will get the data from the boardState and return it in a readable way by the LSTM network
+        self.foundOptions = False
+        self.foundSendOptions = False
+        if self.newGame:
+            self.index = 0
+            boardState.reset()
+            self.newGame = False
+
+        boardState = self.rec_iter(boardState, game)
+
         x = np.array(np.random.choice(2, self.total_series_length, p=[0.5, 0.5]))
         y = np.roll(x, self.echo_step)
         y[0:self.echo_step] = 0
@@ -92,48 +116,85 @@ class RNN(object):
         x = x.reshape((self.batch_size, -1))  # The first index changing slowest, subseries as rows
         y = y.reshape((self.batch_size, -1))
 
-        return (x, y)
+        if self.foundOptions:
+            """TODO: Make a prediction"""
+            return boardState, x, y
+        elif self.foundSendOptions:
+            """TODO: Make a test/train epoch"""
+            return boardState, x, y
+        else:
+            self.endOfGame = True
+            return boardState, x, y
+            # return None, None
 
-    def train(self, gui):
+
+
+
+    def analyzePacket(self, packet, boardState):
+        foundOptions = False
+        foundSendOptions = False
+        if isinstance(packet, packets.Options):
+            """ update last options on boardstate """
+            boardState.setOptions(packet)
+            foundOptions = True
+        elif isinstance(packet, packets.SendOption):
+            """ update selectedOption on boardstate """
+            boardState.setSelectedOptions(packet)
+            foundSendOptions = True
+        elif isinstance(packet, packets.CreateGame):
+            boardState.createGame(packet)
+        elif isinstance(packet, packets.FullEntity):
+            boardState.addEntity(packet)
+        elif isinstance(packet, packets.TagChange):
+            boardState.tagChange(packet)
+        elif isinstance(packet, packets.ShowEntity):
+            boardState.showEntity(packet)
+        elif isinstance(packet, packets.Block):
+            for pack in packet.__iter__():
+                boardState, self.foundOptions, self.foundSendOptions = self.analyzePacket(pack, boardState)
+        else:
+            print(packet)
+
+        return boardState, foundOptions, foundSendOptions
+
+    def train(self, gui, boardState, game):
         """ TODO: Implement """
         # Takes the Boardstate with possible choices and returns the predicted move,
         # saving the error and updates the network
-        x, y = self.generateData()
-        _current_state = np.zeros((self.num_layers, 2, self.batch_size, self.state_size))
+        boardState, x, y = self.generateData(boardState, game)
 
-        # Debug("New data, Epoch", self.epoch_idx)
+        # _current_state = np.zeros((self.num_layers, 2, self.batch_size, self.state_size))
+        #
+        # # Debug("New data, Epoch", self.epoch_idx)
+        #
+        # for batch_idx in range(self.num_batches):
+        #     start_idx = batch_idx * self.truncated_backprop_length
+        #     end_idx = start_idx + self.truncated_backprop_length
+        #
+        #     batchX = x[:, start_idx:end_idx]
+        #     batchY = y[:, start_idx:end_idx]
+        #
+        #     _total_loss, _train_step, _current_state, _prediction_series = self.sess.run(
+        #         [self.total_loss, self.train_step, self.current_state, self.predictions_series],
+        #         feed_dict={
+        #             self.batchX_placeholder: batchX,
+        #             self.batchY_placeholder: batchY,
+        #             self.init_state: _current_state
+        #         })
+        #
+        #     self.loss_list.append(_total_loss)
+        #
+        #     if batch_idx % 100 == 0:
+        #         gui.debug("%s", ("Training:", "Step", batch_idx, "Loss", _total_loss))
 
-        for batch_idx in range(self.num_batches):
-            start_idx = batch_idx * self.truncated_backprop_length
-            end_idx = start_idx + self.truncated_backprop_length
+        return boardState
 
-            batchX = x[:, start_idx:end_idx]
-            batchY = y[:, start_idx:end_idx]
-
-            _total_loss, _train_step, _current_state, _prediction_series = self.sess.run(
-                [self.total_loss, self.train_step, self.current_state, self.predictions_series],
-                feed_dict={
-                    self.batchX_placeholder: batchX,
-                    self.batchY_placeholder: batchY,
-                    self.init_state: _current_state
-                })
-
-            self.loss_list.append(_total_loss)
-
-            if batch_idx % 100 == 0:
-                gui.debug("%s", ("Training:", "Step", batch_idx, "Loss", _total_loss))
-                self.plot(self.loss_list, _prediction_series, batchX, batchY)
-
-    def test(self):
+    def test(self, gui, boardState):
         """ TODO: Implement """
         # Takes the Boardstate with possible choices and returns the predicted move,
         # saving the error but not updating the network
 
-    def predict(self):
+    def predict(self, gui, boardState):
         """ TODO: Implement """
         # Takes the Boardstate with possible choices and returns the predicted move
-
-    def plot(self, loss_list, predictions_series, batchX, batchY):
-        """ TODO: Implement Plotting """
-        # Using the plotting tools we can create graphs to represent the network working
 
