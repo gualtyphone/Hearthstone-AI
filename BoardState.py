@@ -12,11 +12,17 @@ class BoardState(object):
     def __init__(self):
         self.stateDict = {}
         self.board = list()
-        self.options = list()
-        for i in range(100):
+        for i in range(200):
             self.board.append("")
+        self.options = list()
+        self.selectedOptions = list()
+        for i in range(30):
+            self.selectedOptions.append(0.0)
+
+        self.networkOptions = list()
+        for i in range(30):
+            self.networkOptions.append(0.0)
         self.optionsPacket = None
-        self.selectedOptions = {}
         self.reset()
 
     def reset(self):
@@ -24,7 +30,7 @@ class BoardState(object):
         # The various objects will be stored as a ID, Array of tags dictionary
 
         self.board.clear()
-        for i in range(100):
+        for i in range(200):
             self.board.append("")
         self.board[0] = "EndTurnButton"
         self.board[1] = "GameReference"
@@ -42,7 +48,7 @@ class BoardState(object):
         # The various objects will be stored as a ID, Array of tags dictionary
 
         self.board.clear()
-        for i in range(100):
+        for i in range(200):
             self.board.append("")
         self.board[0] = "EndTurnButton"
         self.board[1] = "GameReference"
@@ -74,53 +80,56 @@ class BoardState(object):
         for tag in entity.tags:
             self.stateDict[entity.entity][tag[0]] = tag[1]
 
-    def getOptions(self):
-        # Return the options in a good format
-        """TODO: Implement"""
-        return self.options
-
     def setOptions(self, packet):
-        """TODO: Implement"""
         self.options.clear()
         for opt in packet.options:
             optionDescriptor = (opt.id, " - ", opt.entity, self.board[opt.entity], opt.type)
             self.options.append(optionDescriptor)
+        self.optionsPacket = packet
 
     def setSelectedOptions(self, packet):
-        """TODO: Implement"""
+        for i in range(30):
+            self.selectedOptions[i] = 0.0
+        self.selectedOptions[packet.option] = 1.0
 
-    def get(self, numberOfEntities, lastOptions):
-        result = np.zeros(int((ANNenums.GameTag.__len__() * numberOfEntities) + 150))
+    def setNetworkPrediction(self, prediction):
+        for i in range(30):
+            self.networkOptions[i] = prediction[-1][i]
+
+    def get(self, numberOfEntities):
+        input = np.zeros(int((ANNenums.GameTag.__len__() * numberOfEntities) + 150))
+        output = np.zeros(30)
+        # Define Input in RNN readable format
         y = 0
-        for opt in lastOptions.options:
-            result[y] = opt.entity
+        for opt in self.optionsPacket.options:
+            input[y] = opt.entity
             y += 1
-            result[y] = opt.id
+            input[y] = opt.id
             y += 1
-            result[y] = opt.type
+            input[y] = opt.type
             y += 1
             if (opt.error == None):
-                result[y] = 0
+                input[y] = 0
             else:
-                result[y] = opt.error
+                input[y] = opt.error
             y += 1
             if (opt.error_param == None):
-                result[y] = 0
+                input[y] = 0
             else:
-                result[y] = opt.error_param
+                input[y] = opt.error_param
             y += 1
         for k in sorted(self.stateDict.keys()):
             # row = []
             i = 0
             for k1 in sorted(self.stateDict[k].keys()):
                 # print (ANNenums.GameTag.__len__())
-                result[k*ANNenums.GameTag.__len__() + i + 150] = (self.stateDict[k][k1])
+                input[k*ANNenums.GameTag.__len__() + i + 150] = (self.stateDict[k][k1])
                 i += 1
-            # result.append(row)
-        # for i in result:
-        #     print(i)
-        # print(result)
-        return result
+
+        for index in range(30):
+            output[index] = self.selectedOptions[index]
+
+        return input, output
 
     def print(self):
         result = []

@@ -133,8 +133,9 @@ class HS_GUI(tk.Tk):
         self.status.set(format, *args)
 
     def displayOptionsAndBoard(self, boardstate):
-        """TODO: Implement"""
         self.frames[TrainingDisplay].networkOptions.setOptions(boardstate.options)
+        self.frames[TrainingDisplay].networkSelection.setOptions(boardstate.networkOptions)
+        self.frames[TrainingDisplay].playerSelection.setOptions(boardstate.selectedOptions)
         self.frames[TrainingDisplay].boardstate.setBoard(boardstate.board)
 
 class MainMenu(tk.Frame):
@@ -172,11 +173,14 @@ class TrainingDisplay(tk.Frame):
         optionsFrame = Frame(self)
         self.optionsTitlesFrame = tk.Frame(optionsFrame)
         # OPTIONS Titles
-        self.networkTitle = Label(self.optionsTitlesFrame, text="Network Options", anchor=SW)
+        self.networkTitle = Label(self.optionsTitlesFrame, text="Options", anchor=SW)
         self.networkTitle.pack(fill=X, side=LEFT)
 
-        self.playerTitle = Label(self.optionsTitlesFrame, text="Player Options", anchor=SE)
-        self.playerTitle.pack(fill=X, side=RIGHT)
+        self.playerSelectionTitle = Label(self.optionsTitlesFrame, text="Player Options", anchor=SE)
+        self.playerSelectionTitle.pack(fill=X, side=RIGHT)
+
+        self.networkSelectionTitle = Label(self.optionsTitlesFrame, text="Network Options", anchor=S)
+        self.networkSelectionTitle.pack(fill=X, side=TOP)
 
         self.optionsTitlesFrame.pack(fill=X, expand=True)
 
@@ -185,8 +189,11 @@ class TrainingDisplay(tk.Frame):
         self.networkOptions = OptionsDisplay(self.optionsFrame)
         self.networkOptions.pack(fill=X, side=LEFT, expand=True)
 
-        self.playerOptions = OptionsDisplay(self.optionsFrame)
-        self.playerOptions.pack(fill=X, side=LEFT, expand=True)
+        self.playerSelection = OptionsDisplay(self.optionsFrame)
+        self.playerSelection.pack(fill=X, side=RIGHT, expand=True)
+
+        self.networkSelection = OptionsDisplay(self.optionsFrame)
+        self.networkSelection.pack(fill=X, side=RIGHT, expand=True)
 
         self.optionsFrame.pack(fill=X, expand=True)
 
@@ -288,7 +295,6 @@ class OptionsDisplay(tk.Frame):
         self.list.pack(fill=tk.X, expand=True)
 
     def setOptions(self, optionsList):
-        """TODO: Implement"""
         self.list.delete(0, END)
         for item in optionsList:
             self.list.insert(END, item)
@@ -301,7 +307,6 @@ class BoardStateDisplay(tk.Frame):
         self.list.pack(fill=tk.X, expand=True)
 
     def setBoard(self, boardState):
-        """TODO: Implement"""
         self.list.delete(0, END)
         for item in boardState:
             self.list.insert(END, item)

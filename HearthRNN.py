@@ -13,77 +13,61 @@ matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
-
+import ANNenums
+from tensorflow.contrib import rnn
 
 
 class RNN(object):
     def __init__(self):
-        """ TODO: Implement Constructor """
         # Variables
-        self.x_length = 10  # Number of input variables
-        self.y_length = 10  # Number of output variables
-        self.truncated_backprop_length = 15  # Number of iterations to apply backpropagation
+        self.input_size = (ANNenums.GameTag.__len__() * 200) + 150                                                      # Number of input variables
+        self.hidden_size = 128                                                                                          # Number of hidden cells
+        self.output_size = 30                                                                                           # Number of output variables
 
-        self.total_series_length = 50000
-        self.state_size = 4  # Cell state and Hidden state vector length
-        self.num_classes = 2
-        self.echo_step = 3
-        self.batch_size = 5
-        self.num_batches = self.total_series_length // self.batch_size // self.truncated_backprop_length
-        self.num_layers = 3
 
         self.RUN_NAME = "Run 20"
         self.endOfGame = True
         self.newGame = True
 
         # Tesnorflow placeholders
-        self.batchX_placeholder = tf.placeholder(tf.float32, [None, self.truncated_backprop_length])
-        self.batchY_placeholder = tf.placeholder(tf.int32, [None, self.truncated_backprop_length])
-
-        self.init_state = tf.placeholder(tf.float32, [self.num_layers, 2, None, self.state_size])
-
-        self.state_per_layer_list = tf.unstack(self.init_state, axis=0)
-        self.rnn_tuple_state = tuple(
-            [tf.nn.rnn_cell.LSTMStateTuple(self.state_per_layer_list[idx][0], self.state_per_layer_list[idx][1])
-             for idx in range(self.num_layers)]
-        )
+        self.x_placeholder = tf.placeholder(tf.float32, [None, 1, self.input_size])
+        self.y_placeholder = tf.placeholder(tf.int32, [None, self.output_size])
 
         # Weights
-        self.W2 = tf.Variable(np.random.rand(self.state_size, self.num_classes), dtype=tf.float32)
+        self.weights = tf.Variable(tf.random_normal([self.hidden_size, self.output_size]), dtype=tf.float32)
 
         # Biases
-        self.b2 = tf.Variable(np.zeros((1, self.num_classes)), dtype=tf.float32)
+        self.biases = tf.Variable(tf.random_normal([self.output_size]), dtype=tf.float32)
 
-        def get_a_cell(lstm_size, keep_prob):
-            lstm = tf.nn.rnn_cell.BasicLSTMCell(lstm_size, state_is_tuple=True)
-            drop = tf.nn.rnn_cell.DropoutWrapper(lstm, output_keep_prob=keep_prob)
-            return drop
+        def RNN(x, weights, biases):
+            lstm_cell = rnn.BasicLSTMCell(self.hidden_size, forget_bias=1.0)                                            # Create a LSTM cell
 
-        self.cell = tf.nn.rnn_cell.MultiRNNCell(
-            [get_a_cell(self.state_size, 0.5) for _ in range(self.num_layers)], state_is_tuple=True
-        )
+            outputs, state = tf.nn.dynamic_rnn(lstm_cell, x, dtype=tf.float32,                                          # Create the outputs from LSTM
+                                               time_major=True)
 
-        self.states_series, self.current_state = tf.nn.dynamic_rnn(self.cell, tf.expand_dims(self.batchX_placeholder, -1),
-                                                                   initial_state=self.rnn_tuple_state)
-        self.states_series = tf.reshape(self.states_series, [-1, self.state_size])
+            prediction_operation = tf.matmul(outputs[-1], weights) + biases
 
-        self.logits = tf.matmul(self.states_series, self.W2) + self.b2  # Broadcasted addition
-        self.labels = tf.reshape(self.batchY_placeholder, [-1])
+            return prediction_operation
+
+        self.logits = RNN(self.x_placeholder, self.weights, self.biases)
+        self.labels = tf.reshape(self.y_placeholder, [-1])
 
         # Calculating Loss
-        self.logits_series = tf.unstack(
-            tf.reshape(self.logits, [self.batch_size, self.truncated_backprop_length, self.num_classes]), axis=1)
-        self.predictions_series = [tf.nn.softmax(logit) for logit in self.logits_series]
+        self.prediction_operation = tf.nn.softmax(self.logits)
 
-        self.losses = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.logits, labels=self.labels)
-        self.total_loss = tf.reduce_mean(self.losses)
+        self.loss_operation = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.y_placeholder)
+        self.total_loss_operation = tf.reduce_mean(self.loss_operation)
 
-        self.train_step = tf.train.AdagradOptimizer(0.3).minimize(self.total_loss)
+        self.train_op = tf.train.AdagradOptimizer(0.3).minimize(self.total_loss_operation)
+
+        self.correct_prediction = tf.equal(tf.argmax(self.prediction_operation, 1), tf.argmax(self.y_placeholder, 1))
+        self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
 
         """ INITIALIZE TENSORFLOW SESSION """
         self.sess = tf.Session()
 
-        self.sess.run(tf.initialize_all_variables())
+        init = tf.global_variables_initializer()
+        self.sess.run(init)
         self.loss_list = []
 
     def rec_iter(self, boardState, game):
@@ -98,7 +82,6 @@ class RNN(object):
         return boardState
 
     def generateData(self, boardState, game):
-        """ TODO: Implement Data Generation"""
         # This will get the data from the boardState and return it in a readable way by the LSTM network
         self.foundOptions = False
         self.foundSendOptions = False
@@ -109,12 +92,13 @@ class RNN(object):
 
         boardState = self.rec_iter(boardState, game)
 
-        x = np.array(np.random.choice(2, self.total_series_length, p=[0.5, 0.5]))
-        y = np.roll(x, self.echo_step)
-        y[0:self.echo_step] = 0
+        x, y = boardState.get(200)
 
-        x = x.reshape((self.batch_size, -1))  # The first index changing slowest, subseries as rows
-        y = y.reshape((self.batch_size, -1))
+        x = np.reshape(x, (1, 1, self.input_size))
+        y = np.reshape(y, (1, self.output_size))
+
+        # print(x)
+        # print(y)
 
         if self.foundOptions:
             """TODO: Make a prediction"""
@@ -125,10 +109,6 @@ class RNN(object):
         else:
             self.endOfGame = True
             return boardState, x, y
-            # return None, None
-
-
-
 
     def analyzePacket(self, packet, boardState):
         foundOptions = False
@@ -158,43 +138,45 @@ class RNN(object):
         return boardState, foundOptions, foundSendOptions
 
     def train(self, gui, boardState, game):
-        """ TODO: Implement """
         # Takes the Boardstate with possible choices and returns the predicted move,
         # saving the error and updates the network
         boardState, x, y = self.generateData(boardState, game)
 
-        # _current_state = np.zeros((self.num_layers, 2, self.batch_size, self.state_size))
-        #
-        # # Debug("New data, Epoch", self.epoch_idx)
-        #
-        # for batch_idx in range(self.num_batches):
-        #     start_idx = batch_idx * self.truncated_backprop_length
-        #     end_idx = start_idx + self.truncated_backprop_length
-        #
-        #     batchX = x[:, start_idx:end_idx]
-        #     batchY = y[:, start_idx:end_idx]
-        #
-        #     _total_loss, _train_step, _current_state, _prediction_series = self.sess.run(
-        #         [self.total_loss, self.train_step, self.current_state, self.predictions_series],
-        #         feed_dict={
-        #             self.batchX_placeholder: batchX,
-        #             self.batchY_placeholder: batchY,
-        #             self.init_state: _current_state
-        #         })
-        #
-        #     self.loss_list.append(_total_loss)
-        #
-        #     if batch_idx % 100 == 0:
-        #         gui.debug("%s", ("Training:", "Step", batch_idx, "Loss", _total_loss))
+        gui.debug("%s", "New data")
+        self.sess.run(self.train_op,
+                      feed_dict={
+                          self.x_placeholder: x,
+                          self.y_placeholder: y
+                      })
+
+        pred = self.sess.run(self.prediction_operation,
+                             feed_dict={
+                                 self.x_placeholder: x
+                             })
+        boardState.setNetworkPrediction(pred)
+
+        # Calculate batch loss and accuracy
+        loss, acc, _total_loss = self.sess.run([self.loss_operation, self.accuracy, self.total_loss_operation],
+                          feed_dict={
+                              self.x_placeholder: x,
+                              self.y_placeholder: y
+                          })
+
+        self.loss_list.append(_total_loss)
+
+        # if batch_idx % 100 == 0:
+        gui.debug("%s", ("Training:", "Loss", _total_loss))
 
         return boardState
 
-    def test(self, gui, boardState):
+    def test(self, gui, boardState, game):
         """ TODO: Implement """
         # Takes the Boardstate with possible choices and returns the predicted move,
         # saving the error but not updating the network
+        boardState, x, y = self.generateData(boardState, game)
 
-    def predict(self, gui, boardState):
+    def predict(self, gui, boardState, game):
         """ TODO: Implement """
         # Takes the Boardstate with possible choices and returns the predicted move
+        boardState, x, y = self.generateData(boardState, game)
 

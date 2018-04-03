@@ -19,9 +19,9 @@ def runNetwork(currentEpochCount, boardState):
         if gui.trainMode:
             boardState = network.train(gui, boardState, gameLoader.game)
         if gui.testMode:
-            boardState = network.test(gui, boardState)
+            boardState = network.test(gui, boardState, gameLoader.game)
         if gui.predictMode:
-            boardState = network.predict(gui, boardState)
+            boardState = network.predict(gui, boardState, gameLoader.game)
         gui.Plot(network)
     else:
         # if the network has epochs to run
@@ -30,9 +30,9 @@ def runNetwork(currentEpochCount, boardState):
             if gui.trainMode:
                 boardState = network.train(gui, boardState, gameLoader.game)
             if gui.testMode:
-                boardState = network.test(gui, boardState)
+                boardState = network.test(gui, boardState, gameLoader.game)
             if gui.predictMode:
-                boardState = network.predict(gui, boardState)
+                boardState = network.predict(gui, boardState, gameLoader.game)
             gui.Plot(network)
             # Increase the epoch count
             if network.endOfGame:
