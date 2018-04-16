@@ -37,7 +37,7 @@ class GameLoader(object):
             elif self.mode == 2:
                 self.game = self.loadMacGame()
                 self.newGame = self.checkNewGame()
-            if self.previousGame.games[-1].nodes[-1].ts == self.game.games[-1].nodes[-1].ts:
+            if self.previousGame.games[-1].nodes[-1].ts == self.game.games[-1].nodes[-1].ts and not self.newGame:
                 self.gameUpdated = False
                 return
 

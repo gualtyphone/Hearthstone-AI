@@ -11,7 +11,7 @@ output_size = 3                                                         # Max si
 """INITIALIZE NETWORK"""
 
 x = tf.placeholder(tf.float32, [None, 1, input_size])                   # Inputs
-y = tf.placeholder(tf.float32, [1, output_size])                  # Desired Outputs
+y = tf.placeholder(tf.float32, [1, output_size])                        # Desired Outputs
 
 weights = tf.Variable(tf.random_normal([hidden_size, output_size]))     # Create weights between the hidden layer and output
 biases = tf.Variable(tf.random_normal([output_size]))                   # Create biases for Output layer

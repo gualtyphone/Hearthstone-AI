@@ -82,9 +82,10 @@ class HS_GUI(tk.Tk):
         self.status.pack(side=tk.BOTTOM, fill=tk.X)
 
     def Plot(self, network):
-        """HI"""
         self.frames[Predictions].plt.cla()
         self.frames[Predictions].plt.plot(network.loss_list)
+        self.frames[Predictions].plt.plot(network.accuracy_list)
+        self.frames[Predictions].plt.plot(network.accuracy_percent_list)
 
     """ CALLBACKS """
 

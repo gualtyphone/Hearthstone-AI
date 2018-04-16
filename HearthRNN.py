@@ -21,7 +21,7 @@ class RNN(object):
     def __init__(self):
         # Variables
         self.input_size = (ANNenums.GameTag.__len__() * 200) + 150                                                      # Number of input variables
-        self.hidden_size = 128                                                                                          # Number of hidden cells
+        self.hidden_size = 1200                                                                                         # Number of hidden cells
         self.output_size = 30                                                                                           # Number of output variables
 
 
@@ -58,7 +58,7 @@ class RNN(object):
         self.loss_operation = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.y_placeholder)
         self.total_loss_operation = tf.reduce_mean(self.loss_operation)
 
-        self.train_op = tf.train.AdagradOptimizer(0.3).minimize(self.total_loss_operation)
+        self.train_op = tf.train.AdagradOptimizer(0.03).minimize(self.total_loss_operation)
 
         self.correct_prediction = tf.equal(tf.argmax(self.prediction_operation, 1), tf.argmax(self.y_placeholder, 1))
         self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
@@ -69,6 +69,8 @@ class RNN(object):
         init = tf.global_variables_initializer()
         self.sess.run(init)
         self.loss_list = []
+        self.accuracy_list = []
+        self.accuracy_percent_list = []
 
     def rec_iter(self, boardState, game):
         while self.index < game.games[-1].export().packets.__len__():
@@ -142,30 +144,30 @@ class RNN(object):
         # saving the error and updates the network
         boardState, x, y = self.generateData(boardState, game)
 
-        gui.debug("%s", "New data")
-        self.sess.run(self.train_op,
+        # Run Network session
+        _, _prediction, _accuracy, _total_loss = self.sess.run(
+                     [self.train_op,
+                      self.prediction_operation,
+                      self.accuracy,
+                      self.total_loss_operation],
                       feed_dict={
                           self.x_placeholder: x,
                           self.y_placeholder: y
                       })
 
-        pred = self.sess.run(self.prediction_operation,
-                             feed_dict={
-                                 self.x_placeholder: x
-                             })
-        boardState.setNetworkPrediction(pred)
-
-        # Calculate batch loss and accuracy
-        loss, acc, _total_loss = self.sess.run([self.loss_operation, self.accuracy, self.total_loss_operation],
-                          feed_dict={
-                              self.x_placeholder: x,
-                              self.y_placeholder: y
-                          })
-
+        boardState.setNetworkPrediction(_prediction)
         self.loss_list.append(_total_loss)
+        self.accuracy_list.append(_accuracy)
+        if (self.accuracy_list.__len__() > 100):
+            acc_list = self.accuracy_list[self.accuracy_list.__len__() - 100:-1]
+        else:
+            acc_list = self.accuracy_list[0:-1]
+        _acc_percent = np.sum(acc_list)
+        _acc_percent = _acc_percent/acc_list.__len__()
+        self.accuracy_percent_list.append(_acc_percent * 100)
 
         # if batch_idx % 100 == 0:
-        gui.debug("%s", ("Training:", "Loss", _total_loss))
+        gui.debug("%s", ("Training:", "Loss", _total_loss, "Accuracy", _accuracy))
 
         return boardState
 
